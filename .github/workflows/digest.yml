@@ -1,0 +1,65 @@
+name: ops digest
+
+on:
+  schedule:
+    # pulse: ~8a/12p/4p/8p ET (off-the-hour minutes — Actions congests at :00)
+    - cron: "35 12,16,20,0 * * *"
+    # daily wrap: ~9p ET, always sends even if empty (the heartbeat)
+    - cron: "5 1 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (print only, do not send)"
+        type: boolean
+        default: true
+      mode:
+        description: "pulse or wrap (only used for manual runs)"
+        type: choice
+        options: [pulse, wrap]
+        default: wrap
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Determine mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "5 1 * * *" ]; then
+            echo "mode=wrap" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=pulse" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run digest
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_TO: ${{ secrets.NOTIFY_TO }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARGS="--mode ${{ steps.mode.outputs.mode }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          python -m digest.digest $ARGS
+
+      - name: Commit dedupe ledger
+        if: always()
+        run: |
+          git config user.name "ops-digest-bot"
+          git config user.email "ops-digest-bot@users.noreply.github.com"
+          git add state/_sent.json 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "chore: update dedupe ledger [skip ci]"
+          git push || true
