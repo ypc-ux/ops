@@ -1,0 +1,14 @@
+{
+  "project": "test-project",
+  "generated_at": "2026-09-10T04:48:45.137149+00:00",
+  "signals": [
+    {
+      "project": "test-project",
+      "kind": "needs_you",
+      "title": "fixture check",
+      "detail": "",
+      "ts": "2026-09-10T04:48:45.137079+00:00",
+      "url": ""
+    }
+  ]
+}
