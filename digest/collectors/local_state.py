@@ -1,25 +1,35 @@
 """Reads state/*.json written by publish.py. Emits each project's signals plus
 a `stale` signal if a project hasn't published in >48h — silence reported as
 silence, never as health.
+
+Set OPS_STATE_DIR to point this at a fixtures directory instead, for
+replaying a digest without touching real state (see digest.py --fixtures).
 """
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ..schema import Signal
 
-STATE_DIR = Path(__file__).resolve().parent.parent.parent / "state"
+DEFAULT_STATE_DIR = Path(__file__).resolve().parent.parent.parent / "state"
 STALE_AFTER = timedelta(hours=48)
+
+
+def _state_dir() -> Path:
+    override = os.environ.get("OPS_STATE_DIR")
+    return Path(override) if override else DEFAULT_STATE_DIR
 
 
 def collect(since: datetime) -> list[Signal]:
     out: list[Signal] = []
-    if not STATE_DIR.exists():
+    state_dir = _state_dir()
+    if not state_dir.exists():
         return out
 
     now = datetime.now(timezone.utc)
 
-    for path in sorted(STATE_DIR.glob("*.json")):
+    for path in sorted(state_dir.glob("*.json")):
         if path.name == "_sent.json":
             continue
         try:

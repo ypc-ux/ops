@@ -1,14 +1,19 @@
 """Entrypoint: python -m digest.digest --mode pulse|wrap [--since ISO8601]
-[--dry-run] [--to EMAIL]
+[--dry-run] [--to EMAIL] [--fixtures DIR]
 
 Auto-discovers every module in digest/collectors/, calling its collect(since)
 function. A collector that raises becomes a `broken` signal about itself so
 one bad key or dead API never kills the whole email.
+
+--fixtures replays against a fixtures directory (e.g. digest/fixtures/)
+instead of the real state/ dir, and implies --dry-run — for exercising the
+render/subject logic without waiting for a cron or touching real state.
 """
 import argparse
 import hashlib
 import importlib
 import json
+import os
 import pkgutil
 import sys
 from datetime import datetime, timedelta, timezone
@@ -85,7 +90,16 @@ def main() -> int:
     parser.add_argument("--since", default=None, help="ISO8601 UTC timestamp")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--to", default=None, help="override NOTIFY_TO recipient")
+    parser.add_argument(
+        "--fixtures",
+        default=None,
+        help="replay against this state dir instead of state/ (implies --dry-run)",
+    )
     args = parser.parse_args()
+
+    if args.fixtures:
+        os.environ["OPS_STATE_DIR"] = args.fixtures
+        args.dry_run = True
 
     now = datetime.now(timezone.utc)
     if args.since:

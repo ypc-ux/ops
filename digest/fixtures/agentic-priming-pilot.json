@@ -1,0 +1,14 @@
+{
+  "project": "agentic-priming-pilot",
+  "generated_at": "2026-08-28T09:00:00+00:00",
+  "signals": [
+    {
+      "project": "agentic-priming-pilot",
+      "kind": "did",
+      "title": "case study generated",
+      "detail": "written to case-study.md",
+      "ts": "2026-08-28T09:00:00+00:00",
+      "url": ""
+    }
+  ]
+}
