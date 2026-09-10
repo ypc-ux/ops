@@ -1,12 +1,14 @@
 """Stdlib unittest — no pytest dependency, matching the rest of the repo."""
+import os
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from digest import digest, render
+from digest import digest, github_notify, render
 from digest.schema import Signal
 
 
@@ -86,6 +88,60 @@ class TestDedupe(unittest.TestCase):
         s = sig(project="p", kind="did", title="shipped")
         fresh = digest.dedupe_pulse([s], ledger={}, now=now)
         self.assertEqual(fresh, [])  # `did` isn't urgent, so it's excluded from pulse entirely
+
+
+class TestDelivery(unittest.TestCase):
+    """No secrets in this repo — GitHub Issues must be the zero-config
+    default, with email strictly opt-in once all three vars are set."""
+
+    def setUp(self):
+        self._env_backup = dict(os.environ)
+        for k in ("GMAIL_USER", "GMAIL_APP_PASSWORD", "NOTIFY_TO"):
+            os.environ.pop(k, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._env_backup)
+
+    def test_email_not_configured_by_default(self):
+        self.assertFalse(digest.email_configured())
+
+    def test_email_configured_only_once_all_three_present(self):
+        os.environ["GMAIL_USER"] = "a@example.com"
+        os.environ["GMAIL_APP_PASSWORD"] = "hunter2"
+        self.assertFalse(digest.email_configured())  # NOTIFY_TO still missing
+        os.environ["NOTIFY_TO"] = "b@example.com"
+        self.assertTrue(digest.email_configured())
+
+    def test_to_flag_satisfies_recipient_requirement(self):
+        os.environ["GMAIL_USER"] = "a@example.com"
+        os.environ["GMAIL_APP_PASSWORD"] = "hunter2"
+        self.assertTrue(digest.email_configured(to="override@example.com"))
+
+    def test_deliver_uses_github_notify_with_no_secrets_set(self):
+        with mock.patch.object(github_notify, "notify", return_value="https://github.com/x/y/issues/1") as m:
+            rc = digest.deliver("wrap", "subject", "body")
+        m.assert_called_once_with("wrap", "subject", "body")
+        self.assertEqual(rc, 0)
+
+    def test_deliver_uses_email_once_configured(self):
+        os.environ["GMAIL_USER"] = "a@example.com"
+        os.environ["GMAIL_APP_PASSWORD"] = "hunter2"
+        os.environ["NOTIFY_TO"] = "b@example.com"
+        with mock.patch("digest.digest.mailer.send") as m, mock.patch.object(
+            github_notify, "notify"
+        ) as gh:
+            rc = digest.deliver("wrap", "subject", "body")
+        m.assert_called_once()
+        gh.assert_not_called()
+        self.assertEqual(rc, 0)
+
+    def test_deliver_reports_failure_without_crashing_when_no_token(self):
+        with mock.patch.object(
+            github_notify, "notify", side_effect=github_notify.NotifyConfigError("no token")
+        ):
+            rc = digest.deliver("wrap", "subject", "body")
+        self.assertEqual(rc, 1)
 
 
 if __name__ == "__main__":

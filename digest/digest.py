@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from digest import collectors, mailer, render
+from digest import collectors, github_notify, mailer, render
 from digest.schema import Signal
 
 SENT_LEDGER = Path(__file__).resolve().parent.parent / "state" / "_sent.json"
@@ -127,9 +127,35 @@ def main() -> int:
         print("[ops.digest] --dry-run set, not sending")
         return 0
 
-    mailer.send(subject, body, to=args.to)
-    print("[ops.digest] sent")
-    return 0
+    return deliver(args.mode, subject, body, to=args.to)
+
+
+def email_configured(to: str | None = None) -> bool:
+    """True once all three email secrets are set — email is an opt-in
+    upgrade over the zero-config GitHub Issues default."""
+    return bool(
+        os.environ.get("GMAIL_USER")
+        and os.environ.get("GMAIL_APP_PASSWORD")
+        and (to or os.environ.get("NOTIFY_TO"))
+    )
+
+
+def deliver(mode: str, subject: str, body: str, to: str | None = None) -> int:
+    """Default channel: GitHub Issues, via the GITHUB_TOKEN Actions already
+    provides — nothing to configure. Falls back to email only once
+    email_configured() is true."""
+    if email_configured(to):
+        mailer.send(subject, body, to=to)
+        print("[ops.digest] sent via email")
+        return 0
+
+    try:
+        url = github_notify.notify(mode, subject, body)
+        print(f"[ops.digest] posted to GitHub Issues: {url}")
+        return 0
+    except github_notify.NotifyConfigError as exc:
+        print(f"[ops.digest] could not deliver: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

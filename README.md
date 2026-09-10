@@ -1,16 +1,29 @@
 # ops
 
 Portfolio-wide notification digest. See `CLAUDE.md` for the shape of the
-system. This is the setup checklist to make it actually send mail.
+system.
 
 ## One-time setup
 
-1. **Add repo secrets** (Settings → Secrets and variables → Actions):
-   - `GMAIL_USER` — the sending Gmail address
-   - `GMAIL_APP_PASSWORD` — a Gmail [app password](https://myaccount.google.com/apppasswords), not your normal password
-   - `NOTIFY_TO` — where the digest goes
-2. Nothing else. `GITHUB_TOKEN` for the `gha` collector is provided
-   automatically by Actions.
+**None.** Delivery defaults to opening/commenting on a GitHub Issue in this
+repo, using the `GITHUB_TOKEN` every Actions run already gets automatically
+— nothing to add in Settings. GitHub already notifies you (the repo owner)
+on new issues and comments, so this reaches you with zero configuration.
+
+Digests land labeled `ops-digest`: the daily wrap keeps one rolling open
+issue and appends a comment per run; the pulse opens a fresh issue each
+time it fires, since it only fires when something needs you.
+
+### Optional: switch delivery to email instead
+
+If you'd rather get an email, add these three repo secrets (Settings →
+Secrets and variables → Actions) and the digest switches to email
+automatically — same TLS/app-password pattern as `ascent-ascent`'s
+`submit.js`:
+
+- `GMAIL_USER` — the sending Gmail address
+- `GMAIL_APP_PASSWORD` — a Gmail [app password](https://myaccount.google.com/apppasswords)
+- `NOTIFY_TO` — where the digest goes
 
 ## Verifying it works
 

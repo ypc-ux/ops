@@ -19,8 +19,9 @@ on:
         default: wrap
 
 permissions:
-  contents: read
-  actions: read
+  contents: write # to commit the dedupe ledger back
+  actions: read # to check for failed workflow runs (gha collector)
+  issues: write # default delivery channel — no secrets required
 
 jobs:
   digest:
@@ -44,9 +45,12 @@ jobs:
 
       - name: Run digest
         env:
+          # Optional upgrade path — leave unset and delivery falls back to
+          # GitHub Issues automatically, no setup required.
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           NOTIFY_TO: ${{ secrets.NOTIFY_TO }}
+          # Automatic per-run token — not a repo secret you add yourself.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ARGS="--mode ${{ steps.mode.outputs.mode }}"
